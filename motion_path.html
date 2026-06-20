@@ -1,0 +1,475 @@
+Motion path
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Journey of Light | Premium MotionPath Experience</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ==========================================
+           1. CSS VARIABLES & RESET
+           ========================================== */
+        :root {
+            --theme-color: #00f3ff;
+            --bg-color: #030305;
+            --text-main: #ffffff;
+            --text-muted: rgba(255, 255, 255, 0.4);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            cursor: none; /* Custom cursor */
+            transition: background-color 1s ease;
+        }
+        /* ==========================================
+           2. GLOBAL EFFECTS & NOISE
+           ========================================== */
+        .noise {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.04;
+            background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
+        }
+        .ambient-glow {
+            position: fixed;
+            top: 50%; left: 50%;
+            width: 80vw; height: 80vh;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, var(--theme-color) 0%, transparent 60%);
+            opacity: 0.05;
+            filter: blur(100px);
+            pointer-events: none;
+            z-index: 0;
+            transition: background 1s ease;
+        }
+        /* ==========================================
+           3. MOUSE INTERACTION
+           ========================================== */
+        .cursor {
+            position: fixed;
+            top: 0; left: 0;
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            pointer-events: none;
+            z-index: 10000;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s, border-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cursor::after {
+            content: '';
+            width: 4px; height: 4px;
+            background: var(--theme-color);
+            border-radius: 50%;
+            transition: background 1s ease;
+        }
+        /* ==========================================
+           4. SCROLL CONTAINER & CAMERA
+           ========================================== */
+        #experience-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            perspective: 1000px;
+        }
+        #scene {
+            position: relative;
+            width: 1920px;
+            height: 1080px;
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+        /* ==========================================
+           5. SVG PATH & NODES
+           ========================================== */
+        .svg-container {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1;
+        }
+        .path-base {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.05);
+            stroke-width: 2;
+        }
+        .path-glow {
+            fill: none;
+            stroke: var(--theme-color);
+            stroke-width: 4;
+            filter: drop-shadow(0 0 10px var(--theme-color));
+            transition: stroke 1s ease, filter 1s ease;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .node-marker {
+            position: absolute;
+            width: 20px; height: 20px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: transparent;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            z-index: 2;
+            transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+        .node-marker.active {
+            border-color: var(--theme-color);
+            background: var(--theme-color);
+            box-shadow: 0 0 30px var(--theme-color), inset 0 0 10px #fff;
+            transform: translate(-50%, -50%) scale(1.5);
+        }
+        /* ==========================================
+           6. HERO OBJECT (THE ORB) & TRAIL
+           ========================================== */
+        .orb-wrapper {
+            position: absolute;
+            top: 0; left: 0;
+            width: 0; height: 0;
+            z-index: 10;
+        }
+        .orb {
+            position: absolute;
+            width: 30px; height: 30px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 40px 10px var(--theme-color), 
+                        inset 0 0 20px #fff;
+            backdrop-filter: blur(5px);
+            transition: box-shadow 1s ease;
+            will-change: transform;
+        }
+        /* Pure CSS implementation for trail using JS history */
+        .trail-particle {
+            position: absolute;
+            top: 0; left: 0;
+            width: 15px; height: 15px;
+            border-radius: 50%;
+            background: var(--theme-color);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 9;
+            filter: blur(4px);
+            will-change: transform, opacity;
+            transition: background 1s ease;
+        }
+        /* ==========================================
+           7. EDITORIAL TYPOGRAPHY
+           ========================================== */
+        .typography-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 5;
+            pointer-events: none;
+        }
+        .chapter {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            opacity: 0;
+            will-change: opacity, transform;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .chapter-label {
+            font-size: 0.8rem;
+            letter-spacing: 0.4em;
+            text-transform: uppercase;
+            color: var(--theme-color);
+            margin-bottom: 1rem;
+            font-weight: 700;
+            transition: color 1s ease;
+        }
+        .chapter-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 5rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.2) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+        }
+        .chapter-desc {
+            font-size: 1.1rem;
+            max-width: 400px;
+            line-height: 1.6;
+            color: var(--text-muted);
+            font-weight: 300;
+        }
+        /* Ghost element for scrolling */
+        .scroll-space { height: 600vh; }
+    </style>
+</head>
+<body>
+    <div class="noise"></div>
+    <div class="ambient-glow"></div>
+    <div class="cursor" id="cursor"></div>
+    <div id="experience-container">
+        <div id="scene">
+            <svg class="svg-container" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+                <path id="track-base" class="path-base" 
+                      d="M -100 540 
+                         C 300 540, 350 250, 650 250 
+                         C 950 250, 1050 850, 800 850 
+                         C 550 850, 500 450, 850 450 
+                         C 1200 450, 1300 850, 1600 850 
+                         C 1850 850, 1950 540, 2100 540" />
+                
+                <path id="track-glow" class="path-glow" 
+                      d="M -100 540 
+                         C 300 540, 350 250, 650 250 
+                         C 950 250, 1050 850, 800 850 
+                         C 550 850, 500 450, 850 450 
+                         C 1200 450, 1300 850, 1600 850 
+                         C 1850 850, 1950 540, 2100 540" />
+            </svg>
+            <div id="nodes-container"></div>
+            <div class="orb-wrapper">
+                <div id="trail-container"></div>
+                <div class="orb" id="orb"></div>
+            </div>
+            <div class="typography-layer">
+                <div class="chapter" id="chapter-0">
+                    <div class="chapter-label">Chapter 01</div>
+                    <div class="chapter-title">Discover</div>
+                    <div class="chapter-desc">The journey begins. Uncovering the raw potential of digital energy flowing through the void.</div>
+                </div>
+                <div class="chapter" id="chapter-1">
+                    <div class="chapter-label">Chapter 02</div>
+                    <div class="chapter-title">Design</div>
+                    <div class="chapter-desc">Shaping the chaos. Where raw energy meets geometric precision and architectural intent.</div>
+                </div>
+                <div class="chapter" id="chapter-2">
+                    <div class="chapter-label">Chapter 03</div>
+                    <div class="chapter-title">Build</div>
+                    <div class="chapter-desc">Constructing reality. The synthesis of absolute logic and boundless imagination.</div>
+                </div>
+                <div class="chapter" id="chapter-3">
+                    <div class="chapter-label">Chapter 04</div>
+                    <div class="chapter-title">Animate</div>
+                    <div class="chapter-desc">Breathing life. Motion transforms the static framework into a spectacular living system.</div>
+                </div>
+                <div class="chapter" id="chapter-4">
+                    <div class="chapter-label">Chapter 05</div>
+                    <div class="chapter-title">Launch</div>
+                    <div class="chapter-desc">Ignition sequence complete. Sending pure, unadulterated energy into the digital cosmos.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="scroll-space"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/MotionPathPlugin.min.js"></script>
+    <script>
+        // 1. Initialize GSAP Plugins
+        gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
+        // 2. Data & Settings
+        const storyNodes = [
+            { progress: 0.05, color: '#00f3ff' }, // Discover (Cyan)
+            { progress: 0.28, color: '#ff00e6' }, // Design (Magenta)
+            { progress: 0.52, color: '#ffb000' }, // Build (Gold)
+            { progress: 0.76, color: '#00ffa3' }, // Animate (Teal)
+            { progress: 0.95, color: '#ffffff' }  // Launch (White)
+        ];
+        
+        let activeChapter = -1;
+        // 3. Setup Path Drawing
+        const pathGlow = document.querySelector("#track-glow");
+        const pathLength = pathGlow.getTotalLength();
+        
+        gsap.set(pathGlow, {
+            strokeDasharray: pathLength,
+            strokeDashoffset: pathLength
+        });
+        // 4. Setup Custom Trail System (Performance optimized array)
+        const trailContainer = document.getElementById('trail-container');
+        const numParticles = 25;
+        const trailHistory = [];
+        const trailElements = [];
+        for(let i = 0; i < numParticles; i++) {
+            let el = document.createElement('div');
+            el.classList.add('trail-particle');
+            trailContainer.appendChild(el);
+            trailElements.push(el);
+            trailHistory.push({x: 0, y: 0});
+        }
+        // 5. Build Timelines & ScrollTrigger
+        const tl = gsap.timeline({
+            scrollTrigger: {
+                trigger: "#experience-container",
+                start: "top top",
+                end: "+=5000", // 5000px of scroll duration
+                scrub: 1.2,    // Premium smoothing
+                pin: true,
+                onUpdate: (self) => handleProgressUpdate(self.progress)
+            }
+        });
+        // Animate Orb along Path
+        tl.to("#orb", {
+            motionPath: {
+                path: "#track-base",
+                align: "#track-base",
+                alignOrigin: [0.5, 0.5],
+                autoRotate: true
+            },
+            duration: 1,
+            ease: "power1.inOut"
+        }, 0);
+        // Animate Path Line
+        tl.to(pathGlow, {
+            strokeDashoffset: 0,
+            duration: 1,
+            ease: "power1.inOut"
+        }, 0);
+        // Subtle Camera Push/Pan inside timeline
+        tl.to("#scene", {
+            scale: 1.15,
+            rotationX: 5,
+            duration: 1,
+            ease: "power1.inOut"
+        }, 0);
+        // 6. Inject Nodes programmatically along the SVG path
+        const nodesContainer = document.getElementById('nodes-container');
+        const nodeElements = [];
+        
+        storyNodes.forEach((node, index) => {
+            // Create DOM Node
+            let el = document.createElement('div');
+            el.className = 'node-marker';
+            nodesContainer.appendChild(el);
+            nodeElements.push(el);
+            
+            // Calculate absolute position on the path using GSAP's utility
+            let pt = MotionPathPlugin.getPositionOnPath("#track-base", node.progress);
+            gsap.set(el, { x: pt.x, y: pt.y });
+        });
+        // 7. Logic: Handle Scroll Progress & Storytelling
+        function handleProgressUpdate(progress) {
+            let newActive = -1;
+            
+            // Determine current chapter based on proximity
+            for(let i = storyNodes.length - 1; i >= 0; i--) {
+                if(progress >= storyNodes[i].progress - 0.05) {
+                    newActive = i;
+                    break;
+                }
+            }
+            // If chapter changed, trigger the cinematic transitions
+            if(newActive !== activeChapter && newActive !== -1) {
+                activeChapter = newActive;
+                let activeData = storyNodes[activeChapter];
+                // Update CSS Variable for global lighting shift
+                document.documentElement.style.setProperty('--theme-color', activeData.color);
+                // Handle Typography
+                document.querySelectorAll('.chapter').forEach((chap, i) => {
+                    if(i === activeChapter) {
+                        gsap.to(chap, { 
+                            opacity: 1, y: 0, scale: 1, 
+                            duration: 1.2, ease: "expo.out", overwrite: true 
+                        });
+                    } else {
+                        gsap.to(chap, { 
+                            opacity: 0, y: -20, scale: 0.95, 
+                            duration: 0.8, ease: "power2.in", overwrite: true 
+                        });
+                    }
+                });
+                // Handle Node Activation
+                nodeElements.forEach((node, i) => {
+                    if(i <= activeChapter) {
+                        node.classList.add('active');
+                    } else {
+                        node.classList.remove('active');
+                    }
+                });
+            }
+        }
+        // Initialize first state
+        gsap.set('.chapter', { opacity: 0, y: 20, scale: 0.95 });
+        handleProgressUpdate(0);
+        // 8. Render Loop: Premium Liquid Trail & Parallax
+        const orb = document.getElementById('orb');
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let targetX = mouseX;
+        let targetY = mouseY;
+        // Track Mouse
+        window.addEventListener('mousemove', (e) => {
+            targetX = e.clientX;
+            targetY = e.clientY;
+        });
+        gsap.ticker.add(() => {
+            // A. Smooth Mouse Cursor
+            mouseX += (targetX - mouseX) * 0.1;
+            mouseY += (targetY - mouseY) * 0.1;
+            gsap.set('#cursor', { x: mouseX, y: mouseY });
+            // B. Subtle Scene Parallax on Mouse Move
+            const xOffset = (mouseX / window.innerWidth - 0.5) * 20;
+            const yOffset = (mouseY / window.innerHeight - 0.5) * 20;
+            gsap.to('#scene', {
+                x: -xOffset,
+                y: -yOffset,
+                rotationY: xOffset * 0.5,
+                rotationX: -yOffset * 0.5,
+                duration: 1,
+                ease: "power2.out"
+            });
+            // C. Liquid Trail Logic
+            // Get exact coordinates of orb from GSAP transforms
+            let currentX = gsap.getProperty(orb, "x");
+            let currentY = gsap.getProperty(orb, "y");
+            
+            // Push current position to front of history
+            trailHistory.unshift({ x: currentX, y: currentY });
+            
+            // Keep array size strict
+            if (trailHistory.length > numParticles) {
+                trailHistory.pop();
+            }
+            // Map trail elements to historical coordinates
+            trailElements.forEach((el, index) => {
+                let pos = trailHistory[index];
+                if (pos) {
+                    // Decay scale and opacity based on index in history array
+                    let decay = 1 - (index / numParticles);
+                    gsap.set(el, { 
+                        x: pos.x, 
+                        y: pos.y, 
+                        scale: decay * 1.5,
+                        opacity: decay * 0.8
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
